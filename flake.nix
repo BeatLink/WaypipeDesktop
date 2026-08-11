@@ -34,5 +34,21 @@
                     packages = [ pkgs.python3.pkgs.pytest ];
                 };
             });
+
+            overlays.default = final: _: {
+                waypipe-desktop = final.callPackage ./nix/package.nix { };
+            };
+
+            # System-independent, so they live outside forAllSystems. Each takes `self` so its
+            # default package tracks this flake's own build.
+            homeModules = rec {
+                waypipe-desktop = import ./nix/home-module.nix self;
+                default = waypipe-desktop;
+            };
+
+            nixosModules = rec {
+                waypipe-desktop = import ./nix/nixos-module.nix self;
+                default = waypipe-desktop;
+            };
         };
 }
