@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "waypipe-desktop"
+version = "0.1.0"
+description = "Run Wayland applications from another host inside one shared session per host"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+waypipe-desktop = "waypipe_desktop.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["waypipe_desktop*"]
