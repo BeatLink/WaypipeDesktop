@@ -20,7 +20,8 @@ Nothing has to be installed on the remote host beyond `waypipe` and `dbus-daemon
 - [Commands](#commands)
 - [Setting up the remote host](#setting-up-the-remote-host)
 - [Tuning](#tuning)
-- [Using it from a configuration manager](#using-it-from-a-configuration-manager)
+- [On NixOS](#on-nixos)
+- [Using it from another configuration manager](#using-it-from-another-configuration-manager)
 - [Troubleshooting](#troubleshooting)
 
 ## How it works
@@ -197,7 +198,70 @@ DMABUF cost three times the CPU for fewer frames, and zstd beat lz4 because sshd
 resource. Run `waypipe bench` between your own hosts before changing them; on a fast link with slow
 CPUs the answer is different.
 
-## Using it from a configuration manager
+## On NixOS
+
+Two modules are shipped, one per end of the link. Both are optional; the tool works from a plain
+`config.toml` without either.
+
+### The machine the windows appear on
+
+`homeModules.default` is a Home Manager module. It writes the configuration file *and* declares the
+session services and launchers, so `generate` is never needed — a switch puts all three in place and
+removes the ones you dropped.
+
+```nix
+{
+  inputs.waypipe-desktop.url = "github:BeatLink/WaypipeDesktop";
+
+  # …in your Home Manager configuration:
+  imports = [ inputs.waypipe-desktop.homeModules.default ];
+
+  programs.waypipe-desktop = {
+    enable = true;
+
+    apps.firefox-odin = {
+      title = "Firefox (Odin)";
+      host = "odin-waypipe";
+      command = [ "firefox" "--profile" "/home/beatlink/Personal" ];
+      icon = ./firefox.png;          # a path is copied into the store
+      categories = [ "Network" "WebBrowser" ];
+      audio = true;
+      audioLatency = 400;
+      environment.GDK_BACKEND = "wayland";
+    };
+  };
+}
+```
+
+Options mirror the TOML in camelCase: `sessionName`, `flags`, `socketDir`, `hosts.<name>.{ssh,
+xdgDataDirs, flags}` and `apps.<name>.{title, host, command, environment, icon, categories, audio,
+audioLatency}`. `package` defaults to this flake's build. A `hosts` entry that no app names is an
+assertion failure rather than a setting that silently does nothing.
+
+### The machine the applications run on
+
+`nixosModules.default` covers the far side, which needs no waypipe-desktop of its own:
+
+```nix
+{
+  imports = [ inputs.waypipe-desktop.nixosModules.default ];
+
+  services.waypipe-desktop = {
+    enable = true;
+    user = "beatlink";
+    authorizedKeys = [ "ssh-ed25519 AAAA… waypipe" ];
+  };
+}
+```
+
+That installs `waypipe` and `dbus` system-wide — a non-login ssh session resolves them on the system
+PATH, not the user's — sets `StreamLocalBindUnlink` so the audio forward can rebind, and adds the key.
+
+Where two machines run each other's applications, enable both modules on both.
+
+`overlays.default` provides `pkgs.waypipe-desktop` if you would rather not go through the modules.
+
+## Using it from another configuration manager
 
 If something else already writes systemd units and desktop entries declaratively, skip `generate` and
 have it write them itself. The contract is small:

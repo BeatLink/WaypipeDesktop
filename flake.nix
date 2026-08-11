@@ -28,6 +28,14 @@
                 };
             });
 
+            checks = forAllSystems (pkgs: {
+                package = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+                modules = import ./nix/checks.nix {
+                    inherit (pkgs) lib;
+                    inherit nixpkgs pkgs self;
+                };
+            });
+
             devShells = forAllSystems (pkgs: {
                 default = pkgs.mkShell {
                     inputsFrom = [ self.packages.${pkgs.stdenv.hostPlatform.system}.default ];
