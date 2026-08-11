@@ -20,7 +20,7 @@ in
         user = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
-            example = "beatlink";
+            example = "me";
             description = "User the applications run as, and whose authorized keys {option}`authorizedKeys` are added to.";
         };
 

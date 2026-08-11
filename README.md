@@ -96,7 +96,7 @@ or whatever `--config` names.
 ```toml
 [session]
 # Names the sockets on the remote host. Defaults to this machine's hostname, lowercased.
-name = "thor"
+name = "laptop"
 
 # Applied to every session unless a host overrides them.
 flags = ["--no-gpu", "--compress", "zstd=1"]
@@ -104,14 +104,14 @@ flags = ["--no-gpu", "--compress", "zstd=1"]
 # Where the display, bus and audio sockets are created on the remote host.
 socket-dir = "/tmp"
 
-[apps.firefox-odin]
-title = "Firefox (Odin)"          # shown in the app grid
-host = "odin-waypipe"             # ssh destination, or a key from [hosts]
-command = ["firefox", "--profile", "/home/beatlink/Personal"]
-icon = "/usr/share/icons/firefox.png"   # icon file, or a name from the local theme
+[apps.firefox-remote]
+title = "Firefox (Remote)"                 # shown in the app grid
+host = "workstation-waypipe"               # ssh destination, or a key from [hosts]
+command = ["firefox", "--profile", "/home/me/Personal"]
+icon = "/usr/share/icons/firefox.png"      # icon file, or a name from the local theme
 categories = ["Network", "WebBrowser"]
-audio = true                      # play its sound here rather than on the remote host
-audio-latency = 400               # ms buffered ahead, trading delay for tolerance of a jittery link
+audio = true                               # play its sound here rather than on the remote host
+audio-latency = 400                        # ms buffered ahead, trading delay for a jittery link
 environment = { GDK_BACKEND = "wayland" }
 ```
 
@@ -119,11 +119,13 @@ environment = { GDK_BACKEND = "wayland" }
 table exists only for the cases where something about one host differs:
 
 ```toml
-[hosts.odin-waypipe]
-ssh = "beatlink@10.0.0.2"     # if the key is a label rather than a destination
-xdg-data-dirs = "/usr/share"  # override the portal search path used on that host
-flags = ["--compress", "lz4"] # override the session flags for that host alone
+[hosts.desktop]
+ssh = "me@10.0.0.2"             # when the key is a label rather than a destination
+xdg-data-dirs = "/usr/share"    # override the portal search path used on that host
+flags = ["--compress", "lz4"]   # override the session flags for that host alone
 ```
+
+An app then reaches that host with `host = "desktop"`.
 
 Unrecognised keys are an error rather than being ignored, so a typo shows up the first time you run
 `waypipe-desktop list` instead of silently doing nothing.
@@ -167,9 +169,9 @@ manages that host.
 
    ```
    # ~/.ssh/config
-   Host odin-waypipe
-       HostName odin.example
-       User beatlink
+   Host workstation-waypipe
+       HostName workstation.example
+       User me
        IdentityFile ~/.ssh/waypipe
        IdentitiesOnly yes
    ```
@@ -219,10 +221,10 @@ removes the ones you dropped.
   programs.waypipe-desktop = {
     enable = true;
 
-    apps.firefox-odin = {
-      title = "Firefox (Odin)";
-      host = "odin-waypipe";
-      command = [ "firefox" "--profile" "/home/beatlink/Personal" ];
+    apps.firefox-remote = {
+      title = "Firefox (Remote)";
+      host = "workstation-waypipe";
+      command = [ "firefox" "--profile" "/home/me/Personal" ];
       icon = ./firefox.png;          # a path is copied into the store
       categories = [ "Network" "WebBrowser" ];
       audio = true;
@@ -248,7 +250,7 @@ assertion failure rather than a setting that silently does nothing.
 
   services.waypipe-desktop = {
     enable = true;
-    user = "beatlink";
+    user = "me";
     authorizedKeys = [ "ssh-ed25519 AAAA… waypipe" ];
   };
 }

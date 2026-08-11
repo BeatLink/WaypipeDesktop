@@ -63,7 +63,7 @@ let
 
                 host = lib.mkOption {
                     type = lib.types.str;
-                    example = "odin-waypipe";
+                    example = "workstation";
                     description = "SSH destination to run the application on, or an attribute name from {option}`programs.waypipe-desktop.hosts`.";
                 };
 

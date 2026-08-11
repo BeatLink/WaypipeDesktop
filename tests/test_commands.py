@@ -8,12 +8,12 @@ from waypipe_desktop import launch, session
 
 TEXT = """
 [session]
-name = "thor"
+name = "laptop"
 
-[apps.firefox-odin]
-title = "Firefox (Odin)"
-host = "odin-waypipe"
-command = ["firefox", "--profile", "/home/beatlink/My Profile"]
+[apps.firefox-remote]
+title = "Firefox (Remote)"
+host = "workstation"
+command = ["firefox", "--profile", "/home/me/My Profile"]
 icon = "/nix/store/abc/firefox.png"
 categories = ["Network", "WebBrowser"]
 audio = true
@@ -35,14 +35,14 @@ def loaded(tmp_path):
 
 
 def test_remote_argv_joins_the_session(loaded):
-    argv = launch.remote_argv(loaded, loaded.app("firefox-odin"))
+    argv = launch.remote_argv(loaded, loaded.app("firefox-remote"))
     assert argv[0] == "env"
-    assert "WAYLAND_DISPLAY=/tmp/waypipe-thor-display" in argv
-    assert "DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/waypipe-thor-bus" in argv
-    assert "PULSE_SERVER=unix:/tmp/waypipe-thor-audio" in argv
+    assert "WAYLAND_DISPLAY=/tmp/waypipe-laptop-display" in argv
+    assert "DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/waypipe-laptop-bus" in argv
+    assert "PULSE_SERVER=unix:/tmp/waypipe-laptop-audio" in argv
     assert "PULSE_LATENCY_MSEC=400" in argv
     assert "GDK_BACKEND=wayland" in argv
-    assert argv[-3:] == ["firefox", "--profile", "/home/beatlink/My Profile"]
+    assert argv[-3:] == ["firefox", "--profile", "/home/me/My Profile"]
 
 
 def test_remote_argv_leaves_audio_out_when_unused(loaded):
@@ -52,26 +52,26 @@ def test_remote_argv_leaves_audio_out_when_unused(loaded):
 
 def test_session_argv_carries_no_shell_metacharacters(loaded, monkeypatch):
     monkeypatch.setenv("XDG_RUNTIME_DIR", "/run/user/1000")
-    argv = session.session_argv(loaded, loaded.host("odin-waypipe"), "/home/beatlink", "beatlink")
+    argv = session.session_argv(loaded, loaded.host("workstation"), "/home/me", "me")
     assert argv[:2] == ["waypipe", "--no-gpu"]
-    assert "--display" in argv and "/tmp/waypipe-thor-display" in argv
+    assert "--display" in argv and "/tmp/waypipe-laptop-display" in argv
     assert "-R" in argv
-    assert "/tmp/waypipe-thor-audio:/run/user/1000/pulse/native" in argv
-    assert argv[argv.index("odin-waypipe") + 1] == "env"
+    assert "/tmp/waypipe-laptop-audio:/run/user/1000/pulse/native" in argv
+    assert argv[argv.index("workstation") + 1] == "env"
     assert argv[-1] == "--nopidfile"
     assert not any(set(word) & set("|&;<>()$`\\\"' \t\n") for word in argv)
 
 
 def test_session_argv_omits_the_audio_forward_when_no_app_needs_it(loaded):
-    argv = session.session_argv(loaded, loaded.host("quiet-host"), "/home/beatlink", "beatlink")
+    argv = session.session_argv(loaded, loaded.host("quiet-host"), "/home/me", "me")
     assert "-R" not in argv
 
 
 def test_data_dirs_cover_nix_and_fhs(loaded):
-    argv = session.session_argv(loaded, loaded.host("quiet-host"), "/home/beatlink", "beatlink")
+    argv = session.session_argv(loaded, loaded.host("quiet-host"), "/home/me", "me")
     dirs = next(word for word in argv if word.startswith("XDG_DATA_DIRS="))
-    assert "/home/beatlink/.nix-profile/share" in dirs
-    assert "/etc/profiles/per-user/beatlink/share" in dirs
+    assert "/home/me/.nix-profile/share" in dirs
+    assert "/etc/profiles/per-user/me/share" in dirs
     assert "/usr/share" in dirs
 
 
@@ -90,12 +90,12 @@ def test_generate_writes_and_prunes(loaded, tmp_path, monkeypatch):
     generation.generate(loaded)
 
     assert not stale.exists()
-    unit = (units / "waypipe-session-odin-waypipe.service").read_text()
-    assert "ExecStart=/bin/waypipe-desktop session odin-waypipe" in unit
-    assert "ExecStartPost=/bin/waypipe-desktop wait odin-waypipe" in unit
+    unit = (units / "waypipe-session-workstation.service").read_text()
+    assert "ExecStart=/bin/waypipe-desktop session workstation" in unit
+    assert "ExecStartPost=/bin/waypipe-desktop wait workstation" in unit
     assert "[Install]" not in unit
 
-    entry = (applications / "waypipe-firefox-odin.desktop").read_text()
-    assert "Exec=/bin/waypipe-desktop run firefox-odin" in entry
+    entry = (applications / "waypipe-firefox-remote.desktop").read_text()
+    assert "Exec=/bin/waypipe-desktop run firefox-remote" in entry
     assert "Categories=Network;WebBrowser;" in entry
     assert "Icon=/nix/store/abc/firefox.png" in entry

@@ -10,9 +10,9 @@
 }:
 let
     sample = {
-        sessionName = "thor";
-        hosts.odin = {
-            ssh = "beatlink@10.0.0.2";
+        sessionName = "laptop";
+        hosts.workstation = {
+            ssh = "me@10.0.0.2";
             xdgDataDirs = "/usr/share";
             flags = [
                 "--compress"
@@ -21,12 +21,12 @@ let
         };
         apps = {
             firefox = {
-                title = "Firefox (Odin)";
-                host = "odin";
+                title = "Firefox (Remote)";
+                host = "workstation";
                 command = [
                     "firefox"
                     "--profile"
-                    "/home/beatlink/Personal"
+                    "/home/me/Personal"
                 ];
                 categories = [
                     "Network"
@@ -37,7 +37,7 @@ let
                 audioLatency = 400;
             };
             editor = {
-                host = "beatlink@10.0.0.3";
+                host = "me@10.0.0.3";
                 command = [ "kate" ];
             };
         };
@@ -95,11 +95,11 @@ let
                         fsType = "ext4";
                     };
                     system.stateVersion = "25.05";
-                    users.users.beatlink.isNormalUser = true;
+                    users.users.me.isNormalUser = true;
 
                     services.waypipe-desktop = {
                         enable = true;
-                        user = "beatlink";
+                        user = "me";
                         authorizedKeys = [ "ssh-ed25519 AAAAsample waypipe" ];
                     };
                 }
@@ -117,7 +117,7 @@ let
             map (package: package.name) nixos.environment.systemPackages
         );
         rebind = nixos.services.openssh.settings.StreamLocalBindUnlink;
-        keys = nixos.users.users.beatlink.openssh.authorizedKeys.keys;
+        keys = nixos.users.users.me.openssh.authorizedKeys.keys;
     };
 in
 pkgs.runCommand "waypipe-desktop-modules" { summary = builtins.toJSON summary; } ''
