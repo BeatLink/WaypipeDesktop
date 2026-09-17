@@ -25,6 +25,19 @@ SESSION_ENVIRONMENT = {
 # What the leader is given, rather than what an app is
 LEADER_ENVIRONMENT = {"XDG_DATA_DIRS", "GDK_BACKEND"}
 
+# waypipe's ssh mode runs waypipe on this side too, so the leader arrives inside its server mode
+WAYPIPE_SWITCHES = {
+    "--debug",
+    "--no-gpu",
+    "--unlink-socket",
+    "--vsock",
+    "--xwls",
+    "--test-skip-vulkan",
+    "--test-no-timeline-export",
+    "--test-no-binary-semaphore-import",
+}
+WAYPIPE_SETTINGS = {"--threads", "--compress", "--socket", "--display", "--drm-node"}
+
 
 class Refused(Exception):
     """Raised when the command that arrived is not one the policy allows."""
@@ -55,19 +68,20 @@ def resolve(command: str, policy: dict) -> list[str]:
         if command == protocol.prepare_script(display, bus) or command == protocol.poll_script(bus):
             return ["/bin/sh", "-c", command]
 
-    assignments, argv = _split_environment(command)
+    tokens = _tokens(command)
+    assignments, argv = _split_environment(_strip_waypipe(tokens, policy))
     names = [assignment.split("=", 1)[0] for assignment in assignments]
 
     for session in policy["sessions"]:
         bus = protocol.bus_socket(policy["socket_dir"], session)
         if argv == protocol.leader_argv(bus):
             _check_environment(names, LEADER_ENVIRONMENT)
-            return ["env", *assignments, *argv]
+            return tokens
 
     for app in policy["apps"]:
         if argv == app.get("command"):
             _check_environment(names, SESSION_ENVIRONMENT | set(app.get("environment", [])))
-            return ["env", *assignments, *argv]
+            return tokens
 
     raise Refused(f"no session or app this key may run matches: {shlex.join(argv)}")
 
@@ -78,13 +92,51 @@ def run(command: str, policy: dict) -> None:
     os.execvp(argv[0], argv)
 
 
-def _split_environment(command: str) -> tuple[list[str], list[str]]:
-    """Splits an `env NAME=value ... argv` command into its assignments and the argv after them."""
+def _tokens(command: str) -> list[str]:
+    """The command as argv, which is how it was sent before ssh joined it into one string."""
     try:
-        tokens = shlex.split(command)
+        return shlex.split(command)
     except ValueError as error:
         raise Refused(f"cannot read the command: {error}") from error
 
+
+def _strip_waypipe(tokens: list[str], policy: dict) -> list[str]:
+    """The command inside waypipe's server mode, which is how the leader arrives."""
+    if not tokens or tokens[0] != "waypipe":
+        return tokens
+
+    rest = tokens[1:]
+    while rest and rest[0] != "server":
+        flag = rest[0]
+        if flag in WAYPIPE_SWITCHES or flag.startswith("--video="):
+            rest = rest[1:]
+        elif flag in WAYPIPE_SETTINGS:
+            if len(rest) < 2:
+                raise Refused(f"waypipe was given {flag} with no value")
+            _check_waypipe_path(flag, rest[1], policy)
+            rest = rest[2:]
+        else:
+            raise Refused(f"this key may not pass waypipe {flag}")
+
+    if not rest:
+        raise Refused("waypipe was given no command to serve")
+    return rest[1:]
+
+
+def _check_waypipe_path(flag: str, value: str, policy: dict) -> None:
+    """Keeps the sockets waypipe creates and unlinks among this session's own."""
+    prefixes = {
+        "--socket": f"{policy['socket_dir']}/waypipe",
+        "--display": f"{policy['socket_dir']}/waypipe",
+        "--drm-node": "/dev/dri/",
+    }
+    prefix = prefixes.get(flag)
+    if prefix is not None and not value.startswith(prefix):
+        raise Refused(f"waypipe may not be pointed at {value}")
+
+
+def _split_environment(tokens: list[str]) -> tuple[list[str], list[str]]:
+    """Splits an `env NAME=value ... argv` command into its assignments and the argv after them."""
     if not tokens or tokens[0] != "env":
         raise Refused("a session launches through env, and nothing else may use this key")
 

@@ -291,6 +291,10 @@ including a login shell, an app given arguments it was not declared with, and an
 `WAYLAND_DISPLAY`, `DBUS_SESSION_BUS_ADDRESS`, `PULSE_SERVER`, `PULSE_LATENCY_MSEC` and the ones the
 entry names, which is what keeps `LD_PRELOAD` out.
 
+The session's leader arrives inside waypipe's own `server` mode, which is understood: its flags are
+checked by name, and the sockets it is pointed at have to be this session's own, so a key cannot ask
+waypipe to create or unlink a path elsewhere.
+
 `command` and `environment` are the same values the displaying host declares, so generate them from
 one place rather than writing them twice. Both ends compare commands built from the same code, so run
 the same version on both.

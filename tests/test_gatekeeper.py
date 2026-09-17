@@ -67,3 +67,34 @@ def test_a_shell_is_refused():
         gatekeeper.resolve("", POLICY)
     with pytest.raises(gatekeeper.Refused):
         gatekeeper.resolve("cat /etc/shadow", POLICY)
+
+
+WRAPPED = (
+    "waypipe --debug --unlink-socket --threads 2 --compress zstd=1 "
+    "--socket /tmp/waypipe-server-abc.sock --display /tmp/waypipe-laptop-display server "
+)
+
+
+def test_leader_runs_inside_waypipes_server_mode():
+    command = WRAPPED + "env XDG_DATA_DIRS=/usr/share GDK_BACKEND=wayland " + " ".join(protocol.leader_argv(BUS))
+    assert gatekeeper.resolve(command, POLICY)[0] == "waypipe"
+
+
+def test_waypipe_may_not_be_pointed_outside_the_session_sockets():
+    command = (
+        "waypipe --socket /home/me/.ssh/authorized_keys --unlink-socket server "
+        "env " + " ".join(protocol.leader_argv(BUS))
+    )
+    with pytest.raises(gatekeeper.Refused):
+        gatekeeper.resolve(command, POLICY)
+
+
+def test_an_unknown_waypipe_flag_is_refused():
+    command = WRAPPED.replace("--debug", "--made-up") + "env " + " ".join(protocol.leader_argv(BUS))
+    with pytest.raises(gatekeeper.Refused):
+        gatekeeper.resolve(command, POLICY)
+
+
+def test_waypipe_cannot_serve_a_command_the_policy_does_not_allow():
+    with pytest.raises(gatekeeper.Refused):
+        gatekeeper.resolve(WRAPPED + "env bash -i", POLICY)
