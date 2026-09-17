@@ -78,7 +78,10 @@ let
                 self.homeModules.default
                 {
                     _module.args.pkgs = pkgs;
-                    programs.waypipe-desktop = { enable = true; } // sample;
+                    programs.waypipe-desktop = {
+                        enable = true;
+                    }
+                    // sample;
                 }
             ];
         }).config;
@@ -101,6 +104,17 @@ let
                         enable = true;
                         user = "me";
                         authorizedKeys = [ "ssh-ed25519 AAAAsample waypipe" ];
+                        sessions = [ "laptop" ];
+                        apps = [
+                            {
+                                command = [
+                                    "firefox"
+                                    "--profile"
+                                    "/home/me/My Profile"
+                                ];
+                                environment = [ "GDK_BACKEND" ];
+                            }
+                        ];
                     };
                 }
             ];

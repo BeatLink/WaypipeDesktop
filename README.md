@@ -147,6 +147,7 @@ on mobile data, values around 400 ms stop the stream breaking up when latency sw
 | `waypipe-desktop run <app>` | Start the app's session if needed, then launch the app |
 | `waypipe-desktop session <host>` | Hold a host's session open — this is a unit's `ExecStart` |
 | `waypipe-desktop wait <host>` | Block until a host's session bus answers — a unit's `ExecStartPost` |
+| `waypipe-desktop gatekeeper --policy <file>` | Run what arrived over a restricted key, if the policy allows it |
 
 `generate` owns the files it writes (`waypipe-session-*.service` and `waypipe-*.desktop`) and deletes
 the ones that are no longer configured, so removing an app from the config and re-running it removes
@@ -258,6 +259,41 @@ assertion failure rather than a setting that silently does nothing.
 
 That installs `waypipe` and `dbus` system-wide — a non-login ssh session resolves them on the system
 PATH, not the user's — sets `StreamLocalBindUnlink` so the audio forward can rebind, and adds the key.
+
+The key is added with `restrict,port-forwarding`, which takes away agent and X11 forwarding, pty
+allocation and user rc, and keeps the forwarding the audio socket travels over. Set `restrict = false`
+if you would rather the key were an ordinary one.
+
+### Restricting a key to the apps it launches
+
+On its own, that key still runs whatever it is sent, as the user it belongs to. Naming your session
+and your apps turns it into a forced command instead:
+
+```nix
+  services.waypipe-desktop = {
+    enable = true;
+    user = "me";
+    authorizedKeys = [ "ssh-ed25519 AAAA… waypipe" ];
+
+    sessions = [ "laptop" ];           # session.name on each machine that displays here
+    apps = [
+      {
+        command = [ "firefox" "--profile" "/home/me/Personal" ];
+        environment = [ "GDK_BACKEND" ];
+      }
+    ];
+  };
+```
+
+What arrives then has to be one of those sessions' own commands — the reaper, the readiness poll or
+the bus leader — or an app whose argv matches one of these entries exactly. Anything else is refused,
+including a login shell, an app given arguments it was not declared with, and any variable outside
+`WAYLAND_DISPLAY`, `DBUS_SESSION_BUS_ADDRESS`, `PULSE_SERVER`, `PULSE_LATENCY_MSEC` and the ones the
+entry names, which is what keeps `LD_PRELOAD` out.
+
+`command` and `environment` are the same values the displaying host declares, so generate them from
+one place rather than writing them twice. Both ends compare commands built from the same code, so run
+the same version on both.
 
 Where two machines run each other's applications, enable both modules on both.
 

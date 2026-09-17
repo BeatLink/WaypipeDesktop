@@ -10,13 +10,11 @@ import os
 import shlex
 import subprocess
 
+from . import protocol
 from .config import Config, Host
 
 # Turns a dead link into a unit failure, rather than a session that hangs holding every window
 SSH_KEEPALIVE = ["-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3"]
-
-READY_TRIES = 60
-READY_INTERVAL = "0.2"
 
 
 class SessionError(Exception):
@@ -52,28 +50,14 @@ def session_argv(config: Config, host: Host, home: str, user: str) -> list[str]:
 
 def wait_for_session(config: Config, host: Host) -> None:
     """Blocks until the session's bus answers, so an app never races the display it is about to join."""
-    # Polls on the far side, so waiting for the bus costs one connection rather than one per attempt
-    poll = (
-        f"for _ in $(seq {READY_TRIES}); do "
-        f"if test -S {shlex.quote(config.bus_socket)}; then exit 0; fi; "
-        f"sleep {READY_INTERVAL}; done; exit 1"
-    )
+    poll = protocol.poll_script(config.bus_socket)
     if _ssh(host.ssh, poll).returncode != 0:
         raise SessionError(f"the session bus on {host.ssh} never appeared")
 
 
 def _prepare(config: Config, host: Host) -> tuple[str, str]:
     """Clears the previous session off the remote host and reports its home directory and user."""
-    # sshd does not reap the remote command when the link drops, so without this a restart orphans
-    # the previous bus and strands every app still attached to it
-    script = "; ".join(
-        [
-            f"pkill -f {shlex.quote('^dbus-daemon --session --address=unix:path=' + config.bus_socket)} || true",
-            f"pkill -f {shlex.quote('^waypipe .*--display ' + config.display_socket)} || true",
-            f"rm -f {shlex.quote(config.display_socket)} {shlex.quote(config.bus_socket)}",
-            'printf "%s\\n%s\\n" "$HOME" "$(id -un)"',
-        ]
-    )
+    script = protocol.prepare_script(config.display_socket, config.bus_socket)
     result = _ssh(host.ssh, script, capture=True)
     if result.returncode != 0:
         raise SessionError(f"cannot reach {host.ssh}: {(result.stderr or '').strip()}")
@@ -92,11 +76,7 @@ def _leader_argv(config: Config, host: Host, home: str, user: str) -> list[str]:
         # GDK would otherwise pick X11 and draw the portal's dialogs on the remote host's own screen
         "GDK_BACKEND=wayland",
         # No --systemd-activation, so dbus spawns each portal from its Exec= line and the child inherits this display
-        "dbus-daemon",
-        "--session",
-        f"--address=unix:path={config.bus_socket}",
-        "--nofork",
-        "--nopidfile",
+        *protocol.leader_argv(config.bus_socket),
     ]
 
 

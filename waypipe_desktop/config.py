@@ -13,6 +13,8 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import protocol
+
 CONFIG_ENV = "WAYPIPE_DESKTOP_CONFIG"
 
 # Measured on a laptop to a phone over wifi: DMABUF costs 3x the CPU for fewer frames, and zstd beats lz4 because sshd is the scarcer resource
@@ -70,17 +72,17 @@ class Config:
     @property
     def display_socket(self) -> str:
         """Wayland socket the session serves on the remote host."""
-        return f"{self.socket_dir}/waypipe-{self.session}-display"
+        return protocol.display_socket(self.socket_dir, self.session)
 
     @property
     def bus_socket(self) -> str:
         """Session bus socket the leader serves on the remote host."""
-        return f"{self.socket_dir}/waypipe-{self.session}-bus"
+        return protocol.bus_socket(self.socket_dir, self.session)
 
     @property
     def audio_socket(self) -> str:
         """PulseAudio socket forwarded to the remote host."""
-        return f"{self.socket_dir}/waypipe-{self.session}-audio"
+        return protocol.audio_socket(self.socket_dir, self.session)
 
     def host(self, key: str) -> Host:
         """Host named by key, defaulting to one whose ssh destination is the key itself."""

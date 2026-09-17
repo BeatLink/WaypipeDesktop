@@ -3,24 +3,27 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 from . import config as configuration
 from . import generate as generation
-from . import launch, session
+from . import gatekeeper, launch, session
 
 
 def main(argv: list[str] | None = None) -> int:
     """Parses arguments, loads the configuration and runs the chosen subcommand."""
     arguments = _parser().parse_args(argv)
     try:
-        loaded = configuration.load(arguments.config)
+        # The far side runs one subcommand and has no configuration of its own to load
+        loaded = configuration.load(arguments.config) if getattr(arguments, "needs_config", True) else None
         return arguments.handler(loaded, arguments)
     except (
         configuration.ConfigError,
         session.SessionError,
         launch.LaunchError,
+        gatekeeper.Refused,
         RuntimeError,
     ) as error:
         print(f"waypipe-desktop: {error}", file=sys.stderr)
@@ -53,6 +56,12 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("app")
     run.set_defaults(handler=_run)
 
+    guard = subcommands.add_parser(
+        "gatekeeper", help="run what arrived over a restricted key, if the policy allows it"
+    )
+    guard.add_argument("--policy", type=Path, required=True)
+    guard.set_defaults(handler=_gatekeeper, needs_config=False)
+
     listing = subcommands.add_parser("list", help="show the configured hosts and apps")
     listing.set_defaults(handler=_list)
 
@@ -79,6 +88,12 @@ def _wait(loaded: configuration.Config, arguments) -> int:
 def _run(loaded: configuration.Config, arguments) -> int:
     """Launches one app, replacing this process with the ssh that carries it."""
     launch.run_app(loaded, loaded.app(arguments.app))
+    return 0
+
+
+def _gatekeeper(_loaded, arguments) -> int:
+    """Runs what the client asked for, if this host's policy allows it."""
+    gatekeeper.run(os.environ.get("SSH_ORIGINAL_COMMAND", ""), gatekeeper.load_policy(arguments.policy))
     return 0
 
 
