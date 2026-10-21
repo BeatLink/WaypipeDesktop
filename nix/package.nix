@@ -21,7 +21,12 @@ python3Packages.buildPythonApplication {
     pyproject = true;
 
     build-system = [ python3Packages.setuptools ];
-    makeWrapperArgs = [ "--prefix PATH : ${lib.makeBinPath runtimeInputs}" ];
+    makeWrapperArgs = [
+        "--prefix"
+        "PATH"
+        ":"
+        (lib.makeBinPath runtimeInputs)
+    ];
 
     nativeCheckInputs = [ python3Packages.pytest ];
     checkPhase = ''
