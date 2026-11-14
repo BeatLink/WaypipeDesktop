@@ -1,5 +1,7 @@
 # waypipe-desktop
 
+<a href="https://liberapay.com/BeatLink/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a>
+
 Run Wayland applications from another host and have them appear on this one, as ordinary entries in
 your app grid.
 
